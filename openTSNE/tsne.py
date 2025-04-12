@@ -372,6 +372,9 @@ class PartialTSNEEmbedding(np.ndarray):
                 optimizer=self.optimizer.copy(),
                 **self.gradient_descent_params,
             )
+        
+        if not hasattr(embedding, "kl_divergence_per_iter"):
+            embedding.kl_divergence_per_iter = np.array([])
 
         # If optimization parameters were passed to this funciton, prefer those
         # over the defaults specified in the TSNE object
@@ -383,18 +386,27 @@ class PartialTSNEEmbedding(np.ndarray):
         try:
             # Run gradient descent with the embedding optimizer so gains are
             # properly updated and kept
-            error, embedding = embedding.optimizer(
+            error, embedding, error_per_iter = embedding.optimizer(
                 embedding=embedding,
                 reference_embedding=self.reference_embedding,
                 P=self.P,
                 **optim_params,
             )
 
+            embedding.kl_divergence_per_iter = np.concatenate([
+                embedding.kl_divergence_per_iter,
+                error_per_iter
+            ])
+
         except OptimizationInterrupt as ex:
             log.info("Optimization was interrupted with callback.")
             if propagate_exception:
                 raise ex
             error, embedding = ex.error, ex.final_embedding
+            embedding.kl_divergence_per_iter = np.append(
+                embedding.kl_divergence_per_iter,
+                ex.error
+            )
 
         embedding.kl_divergence = error
 
@@ -1757,6 +1769,8 @@ class gradient_descent:
             "ints_in_interval": ints_in_interval,
         }
 
+        error_per_iter = np.zeros(n_iter + 1)
+        
         # Lie about the P values for bigger attraction forces
         if exaggeration is None:
             exaggeration = 1
@@ -1797,6 +1811,8 @@ class gradient_descent:
                 n_jobs=n_jobs,
                 should_eval_error=should_eval_error,
             )
+
+            error_per_iter[iteration] = error
 
             # Clip gradients to avoid points shooting off. This can be an issue
             # when applying transform and points are initialized so that the new
@@ -1885,4 +1901,6 @@ class gradient_descent:
             should_eval_error=True,
         )
 
-        return error, embedding
+        error_per_iter[n_iter] = error
+
+        return error, embedding, error_per_iter
