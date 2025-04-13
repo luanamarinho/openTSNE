@@ -378,8 +378,6 @@ class PartialTSNEEmbedding(np.ndarray):
 
         if not hasattr(embedding, "kl_divergence_per_iter"):
             embedding.kl_divergence_per_iter = np.array([])
-        if not hasattr(embedding, "norm_grad_per_iter"):
-            embedding.norm_grad_per_iter = np.array([])
 
         # If optimization parameters were passed to this funciton, prefer those
         # over the defaults specified in the TSNE object
@@ -391,7 +389,7 @@ class PartialTSNEEmbedding(np.ndarray):
         try:
             # Run gradient descent with the embedding optimizer so gains are
             # properly updated and kept
-            error, embedding, error_per_iter, norm_grad_per_iter = embedding.optimizer(
+            error, embedding, error_per_iter = embedding.optimizer(
                 embedding=embedding,
                 reference_embedding=self.reference_embedding,
                 P=self.P,
@@ -402,10 +400,6 @@ class PartialTSNEEmbedding(np.ndarray):
                 [embedding.kl_divergence_per_iter, error_per_iter]
             )
 
-            embedding.norm_grad_per_iter = np.concatenate(
-                [embedding.norm_grad_per_iter, norm_grad_per_iter]
-            )
-
         except OptimizationInterrupt as ex:
             log.info("Optimization was interrupted with callback.")
             if propagate_exception:
@@ -413,9 +407,6 @@ class PartialTSNEEmbedding(np.ndarray):
             error, embedding = ex.error, ex.final_embedding
             embedding.kl_divergence_per_iter = np.append(
                 embedding.kl_divergence_per_iter, ex.error
-            )
-            embedding.norm_grad_per_iter = np.append(
-                embedding.norm_grad_per_iter, ex.error
             )
 
         embedding.kl_divergence = error
@@ -692,8 +683,6 @@ class TSNEEmbedding(np.ndarray):
 
         if not hasattr(embedding, "kl_divergence_per_iter"):
             embedding.kl_divergence_per_iter = np.array([])
-        if not hasattr(embedding, "norm_grad_per_iter"):
-            embedding.norm_grad_per_iter = np.array([])
 
         # If optimization parameters were passed to this funciton, prefer those
         # over the defaults specified in the TSNE object
@@ -705,15 +694,12 @@ class TSNEEmbedding(np.ndarray):
         try:
             # Run gradient descent with the embedding optimizer so gains are
             # properly updated and kept
-            error, embedding, error_per_iter, norm_grad_per_iter = embedding.optimizer(
+            error, embedding, error_per_iter = embedding.optimizer(
                 embedding=embedding, P=self.affinities.P, **optim_params
             )
 
             embedding.kl_divergence_per_iter = np.concatenate(
                 [embedding.kl_divergence_per_iter, error_per_iter]
-            )
-            embedding.norm_grad_per_iter = np.concatenate(
-                [embedding.norm_grad_per_iter, norm_grad_per_iter]
             )
 
         except OptimizationInterrupt as ex:
@@ -723,9 +709,6 @@ class TSNEEmbedding(np.ndarray):
             error, embedding = ex.error, ex.final_embedding
             embedding.kl_divergence_per_iter = np.append(
                 embedding.kl_divergence_per_iter, ex.error
-            )
-            embedding.norm_grad_per_iter = np.append(
-                embedding.norm_grad_per_iter, ex.error
             )
 
         embedding.kl_divergence = error
@@ -1810,7 +1793,6 @@ class gradient_descent:
         }
 
         error_per_iter = np.zeros(n_iter + 1)
-        norm_grad_per_iter = np.zeros(n_iter + 1)
 
         # Lie about the P values for bigger attraction forces
         if exaggeration is None:
@@ -1852,7 +1834,7 @@ class gradient_descent:
                 fft_params=fft_params,
                 reference_embedding=reference_embedding,
                 n_jobs=n_jobs,
-                should_eval_error=True,  # enforcing normalization of error
+                should_eval_error=True, #enforcing normalization of error
             )
 
             error_per_iter[iteration] = error
@@ -1866,8 +1848,6 @@ class gradient_descent:
                 coeff = max_grad_norm / (norm + 1e-6)
                 mask = coeff < 1
                 gradient[mask] *= coeff[mask, None]
-
-            norm_grad_per_iter[iteration] = np.linalg.norm(gradient, axis=1)
 
             # Correct the KL divergence w.r.t. the exaggeration if needed
             if should_eval_error and exaggeration != 1:
@@ -1952,4 +1932,4 @@ class gradient_descent:
 
         error_per_iter[n_iter] = error
 
-        return error, embedding, error_per_iter, norm_grad_per_iter
+        return error, embedding, error_per_iter
