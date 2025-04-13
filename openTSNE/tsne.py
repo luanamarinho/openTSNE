@@ -681,6 +681,9 @@ class TSNEEmbedding(np.ndarray):
                 **self.gradient_descent_params,
             )
 
+        if not hasattr(embedding, "kl_divergence_per_iter"):
+            embedding.kl_divergence_per_iter = np.array([])
+
         # If optimization parameters were passed to this funciton, prefer those
         # over the defaults specified in the TSNE object
         optim_params = dict(self.gradient_descent_params)
@@ -691,8 +694,12 @@ class TSNEEmbedding(np.ndarray):
         try:
             # Run gradient descent with the embedding optimizer so gains are
             # properly updated and kept
-            error, embedding = embedding.optimizer(
+            error, embedding, error_per_iter = embedding.optimizer(
                 embedding=embedding, P=self.affinities.P, **optim_params
+            )
+
+            embedding.kl_divergence_per_iter = np.concatenate(
+                [embedding.kl_divergence_per_iter, error_per_iter]
             )
 
         except OptimizationInterrupt as ex:
@@ -700,6 +707,9 @@ class TSNEEmbedding(np.ndarray):
             if propagate_exception:
                 raise ex
             error, embedding = ex.error, ex.final_embedding
+            embedding.kl_divergence_per_iter = np.append(
+                embedding.kl_divergence_per_iter, ex.error
+            )
 
         embedding.kl_divergence = error
 
@@ -965,9 +975,11 @@ class TSNEEmbedding(np.ndarray):
         if len(result) == 2:  # 1d case
             self.interp_coeffs, self.box_x_lower_bounds = result
         elif len(result) == 3:  # 2d case
-            self.interp_coeffs, self.box_x_lower_bounds, self.box_y_lower_bounds = (
-                result
-            )
+            (
+                self.interp_coeffs,
+                self.box_x_lower_bounds,
+                self.box_y_lower_bounds,
+            ) = result
         else:
             raise RuntimeError(
                 "Prepare interpolation grid function returned >3 values!"
