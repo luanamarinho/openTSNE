@@ -1834,7 +1834,7 @@ class gradient_descent:
                 fft_params=fft_params,
                 reference_embedding=reference_embedding,
                 n_jobs=n_jobs,
-                should_eval_error=should_eval_error,
+                should_eval_error=True, #enforcing normalization of error
             )
 
             error_per_iter[iteration] = error
