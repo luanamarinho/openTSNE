@@ -702,6 +702,8 @@ class TSNEEmbedding(np.ndarray):
                 [embedding.kl_divergence_per_iter, error_per_iter]
             )
 
+            embedding.kl_divergence = error
+
         except OptimizationInterrupt as ex:
             log.info("Optimization was interrupted with callback.")
             if propagate_exception:
@@ -711,7 +713,8 @@ class TSNEEmbedding(np.ndarray):
                 embedding.kl_divergence_per_iter, ex.error
             )
 
-        embedding.kl_divergence = error
+        except Exception as e:
+            log.debug(f"Optimization failed with exception: {e}. n_components={self.n_components}, method={self.negative_gradient_method}")
 
         return embedding
 
@@ -1303,6 +1306,9 @@ class TSNE(BaseEstimator):
             log.info("Optimization was interrupted with callback.")
             embedding = ex.final_embedding
 
+        except Exception as ex:
+            log.debug("Optimization failed with exception: %s", ex)
+
         return embedding
 
     def prepare_initial(self, X=None, affinities=None, initialization=None):
@@ -1500,7 +1506,13 @@ def kl_divergence_bh(
         reference_embedding = embedding
 
     # Compute negative gradient
-    tree = QuadTree(reference_embedding)
+    log.info(f"Building tree for embedding with shape {np.asarray(reference_embedding).shape}")
+    try:
+        tree = QuadTree(reference_embedding)
+        log.info("Tree built successfully")
+    except Exception as ex:
+        log.error(f"Failed to build tree: {ex}")
+        raise
     sum_Q = _tsne.estimate_negative_gradient_bh(
         tree,
         embedding,
