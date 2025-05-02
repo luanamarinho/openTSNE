@@ -1506,36 +1506,50 @@ def kl_divergence_bh(
         reference_embedding = embedding
 
     # Compute negative gradient
-    log.info(f"Building tree for embedding with shape {np.asarray(reference_embedding).shape}")
     try:
         tree = QuadTree(reference_embedding)
-        log.info("Tree built successfully")
+        log.debug("Tree built successfully")
     except Exception as ex:
-        log.error(f"Failed to build tree: {ex}")
-        raise
-    sum_Q = _tsne.estimate_negative_gradient_bh(
-        tree,
-        embedding,
-        gradient,
-        **bh_params,
-        dof=dof,
-        num_threads=n_jobs,
-        pairwise_normalization=pairwise_normalization,
-    )
-    del tree
+        log.error("Failed to build tree %s:", str(ex))
+        raise RuntimeError(
+            "Barnes-Hut optimization failed during tree construction: %s", str(ex)
+        ) from ex
+    try:
+        sum_Q = _tsne.estimate_negative_gradient_bh(
+            tree,
+            embedding,
+            gradient,
+            **bh_params,
+            dof=dof,
+            num_threads=n_jobs,
+            pairwise_normalization=pairwise_normalization,
+        )
+    except Exception as ex:
+        log.error("Failed to compute attraction forces %s:", str(ex))
+        raise RuntimeError(
+            "Barnes-Hut optimization failed during repulsive forces computation"
+        ) from ex
+    finally:
+        del tree
 
     # Compute positive gradient
-    sum_P, kl_divergence_ = _tsne.estimate_positive_gradient_nn(
-        P.indices,
-        P.indptr,
-        P.data,
-        embedding,
-        reference_embedding,
-        gradient,
-        dof,
-        num_threads=n_jobs,
-        should_eval_error=should_eval_error,
-    )
+    try:
+        sum_P, kl_divergence_ = _tsne.estimate_positive_gradient_nn(
+            P.indices,
+            P.indptr,
+            P.data,
+            embedding,
+            reference_embedding,
+            gradient,
+            dof,
+            num_threads=n_jobs,
+            should_eval_error=should_eval_error,
+        )
+    except Exception as ex:
+        log.error("Failed to compute attraction forces %s:", str(ex))
+        raise RuntimeError(
+            "Barnes-Hut optimization failed during attraction forces computation"
+        ) from ex
 
     # Computing positive gradients summed up only unnormalized q_ijs, so we
     # have to include normalziation term separately
