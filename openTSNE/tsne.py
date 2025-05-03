@@ -714,7 +714,7 @@ class TSNEEmbedding(np.ndarray):
             )
 
         except Exception as e:
-            log.debug(f"Optimization failed with exception: {e}. n_components={self.n_components}, method={self.negative_gradient_method}")
+            log.error(f"Optimization failed with exception: {e}")
 
         return embedding
 
@@ -1306,9 +1306,6 @@ class TSNE(BaseEstimator):
             log.info("Optimization was interrupted with callback.")
             embedding = ex.final_embedding
 
-        except Exception as ex:
-            log.debug("Optimization failed with exception: %s", ex)
-
         return embedding
 
     def prepare_initial(self, X=None, affinities=None, initialization=None):
@@ -1384,9 +1381,14 @@ class TSNE(BaseEstimator):
         if initialization is None:
             initialization = self.initialization
             log.info(
-                "Precomputed initialization provided. Ignoring initalization-related "
-                "parameters."
+                "No initialization provided. Using initialization parameters from the constructor."
             )
+            if self.n_components > 3:
+                raise ValueError(
+                    "t-SNE is not designed for high dimensions. "
+                    "Barnes-Hut only supports up to 3 dimensions and FFT only supports up to 2."
+                )
+
 
         # If only the affinites have been specified, and the initialization depends
         # on `X`, switch to spectral initalization
