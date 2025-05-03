@@ -1389,7 +1389,6 @@ class TSNE(BaseEstimator):
                     "Barnes-Hut only supports up to 3 dimensions and FFT only supports up to 2."
                 )
 
-
         # If only the affinites have been specified, and the initialization depends
         # on `X`, switch to spectral initalization
         if X is None and isinstance(initialization, str) and initialization == "pca":
@@ -1862,7 +1861,7 @@ class gradient_descent:
                 fft_params=fft_params,
                 reference_embedding=reference_embedding,
                 n_jobs=n_jobs,
-                should_eval_error=True, #enforcing normalization of error
+                should_eval_error=True,  # enforcing normalization of error
             )
 
             error_per_iter[iteration] = error
